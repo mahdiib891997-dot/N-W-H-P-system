@@ -6,14 +6,13 @@ import os
 # إعدادات البوت الأساسية
 intents = discord.Intents.default()
 intents.members = True # ضروري للتفاعل مع أعضاء السيرفر
-intents.message_content = True # ضروري جداً لقراءة محتوى الرسائل وحظر الروابط والهكر
+intents.message_content = True # ضروري جداً لقراءة محتوى الرسائل
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ----------------- إعدادات روم السجلات (Logs) -----------------
-# الـ ID الصحيح لروم السجلات الخاص بك
+# إعدادات روم السجلات (Logs)
 LOG_CHANNEL_ID = 1528789041934368900
 
-# قائمة الكلمات والروابط الشهيرة المرتبطة بالاختراق والمسابقات الوهمية (مثل الصور المزيفة)
+# كلمات مفتاحية احتياطية (لو كتب نص مع الصورة)
 SCAM_KEYWORDS = [
     "nitro", "free nitro", "steamgift", "steam-nitro", 
     "airdrop", "crypto", "usdt", "giveaway", "tasowin", 
@@ -22,9 +21,9 @@ SCAM_KEYWORDS = [
 
 @bot.event
 async def on_ready():
-    print(f"تم تسجيل الدخول بنجاح! بوت الحماية يعمل الآن باسم: {bot.user}")
+    print(f"تم تسجيل الدخول بنجاح! بوت حماية الصور يعمل الآن باسم: {bot.user}")
 
-# ----------------- نظام الحماية الشامل ضد الهكر والروابط -----------------
+# ----------------- نظام الحماية المشدد ضد الصور والروابط الخبيثة -----------------
 @bot.event
 async def on_message(message):
     # تجاهل رسائل البوتات
@@ -35,28 +34,22 @@ async def on_message(message):
     is_scam = False
     violation_reason = ""
 
-    # 1. فحص نص الرسالة بحثاً عن كلمات أو روابط سرقة الحسابات الشائعة
+    # 1. فحص إذا كانت الرسالة تحتوي على "صور مرفقة" (Attachments) -> هذا هو الأهم بناءً على طلبك
+    if message.attachments:
+        is_scam = True
+        violation_reason = "إرسال صورة مشبوهة / صورة اختراق محتملة"
+
+    # 2. فحص الكلمات المفتاحية النصية في حال وجدت
     for word in SCAM_KEYWORDS:
         if word in content_lower:
             is_scam = True
             violation_reason = f"إرسال رابط أو كلمات مشبوهة (تحتوي على: {word})"
             break
 
-    # 2. فحص الروابط الخارجية (إذا أردت حظر أي رابط غريب يحتوي على http أو https)
-    if "http://" in content_lower or "https://" in content_lower:
-        # إذا أردت تفعيل حظر كل الروابط الخارجية، أزل علامة الـ # عن السطر التالي:
-        # is_scam = True
-        # violation_reason = "إرسال رابط خارجي مشبوه"
-        pass
-
-    # 3. فحص إذا كانت الرسالة تحتوي على صور مرفقة مع كلمات مفتاحية مشبوهة
-    if message.attachments and is_scam:
-        violation_reason = "إرسال صورة ومحتوى اختراق مسروق"
-
-    # إذا تأكد البوت أن الرسالة تخص هكر أو عملية اختراق
+    # إذا تأكد البوت أن هناك صورة أو رسالة مخالفة
     if is_scam:
         try:
-            # أولاً: حذف الرسالة فوراً قبل أن يراها أو يضغط عليها أحد
+            # أولاً: حذف الصورة أو الرسالة فوراً
             await message.delete()
             
             # ثانياً: معاقبة العضو المخترق بإعطائه "تايم أوت" (Timeout) لمدة أسبوع كامل (7 أيام)
@@ -76,7 +69,7 @@ async def on_message(message):
             # إذا وُجد روم السجلات، يتم إرسال السجل (Embed)
             if log_channel:
                 embed = discord.Embed(
-                    title="🚨 سجل عقوبات حماية السيرفر",
+                    title="🚨 سجل عقوبات حماية السيرفر (صور/هكر)",
                     color=discord.Color.red(),
                     timestamp=datetime.datetime.now()
                 )
@@ -88,11 +81,11 @@ async def on_message(message):
                 
                 await log_channel.send(embed=embed)
 
-            # رابعاً: إرسال تنبيه مؤقت في الشات العام ثم حذفه بعد 10 ثواني ليبقى المكان نظيفاً
-            warning_msg = await message.channel.send(f"🚨 **نظام الحماية:** تم رصد محاولة اختراق من العضو {message.author.mention}، وتم اتخاذ الإجراء بحقه ونشر التفاصيل في سجلات البوت.")
+            # رابعاً: إرسال تنبيه مؤقت في الشات العام ثم حذفه بعد 10 ثواني
+            warning_msg = await message.channel.send(f"🚨 **نظام الحماية:** تم رصد صورة/رسالة مشبوهة من العضو {message.author.mention}، وتم حذفها وإعطاؤه تايم أوت أسبوع.")
             await warning_msg.delete(delay=10)
             
-            print(f"تم التصدي لمحاولة اختراق بنجاح من العضو: {message.author.name} والسبب: {violation_reason}")
+            print(f"تم حذف صورة/رسالة مخترق بنجاح من العضو: {message.author.name} والسبب: {violation_reason}")
         except Exception as e:
             print(f"خطأ أثناء معاقبة المخترق وإرسال السجل: {e}")
 
