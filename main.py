@@ -5,71 +5,65 @@ import os
 
 # إعدادات البوت الأساسية
 intents = discord.Intents.default()
-intents.members = True # ضروري للتفاعل مع أعضاء السيرفر
-intents.message_content = True # ضروري جداً لقراءة محتوى الرسائل
+intents.members = True 
+intents.message_content = True 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# إعدادات روم السجلات (Logs)
+# ----------------- إعدادات الروم المستهدف وروم السجلات -----------------
+# 1. آيدي روم السجلات (Logs) الذي ستظهر فيه العقوبات
 LOG_CHANNEL_ID = 1528789041934368900
 
-# كلمات مفتاحية احتياطية (لو كتب نص مع الصورة)
-SCAM_KEYWORDS = [
-    "nitro", "free nitro", "steamgift", "steam-nitro", 
-    "airdrop", "crypto", "usdt", "giveaway", "tasowin", 
-    "robux", "discord.gift", "discorb.com", "steampay"
-]
+# 2. آيدي الروم الوحيد الذي تريد حمايته ومنع إرسال الصور فيه (روم البداية)
+# ضع آيدي الروم الخاص بالبداية هنا بدلاً من أصفار أو الرقم التجريبي
+TARGET_CHANNEL_ID = 1528793300394574053  # <--- ضع آيدي روم البداية هنا
 
 @bot.event
 async def on_ready():
-    print(f"تم تسجيل الدخول بنجاح! بوت حماية الصور يعمل الآن باسم: {bot.user}")
+    print(f"تم تسجيل الدخول بنجاح! بوت الحماية المخصص يعمل الآن باسم: {bot.user}")
 
-# ----------------- نظام الحماية المشدد ضد الصور والروابط الخبيثة -----------------
+# ----------------- نظام الحماية المخصص للروم المحدد فقط -----------------
 @bot.event
 async def on_message(message):
     # تجاهل رسائل البوتات
     if message.author.bot:
         return
 
-    content_lower = message.content.lower()
-    is_scam = False
+    # الشرط الأساسي: هل الرسالة مرسلة في الروم المحدد بالبداية فقط؟
+    # إذا كانت في روم آخر، البوت يتجاهلها تماماً ولا يفعل شيئاً
+    if message.channel.id != TARGET_CHANNEL_ID:
+        await bot.process_commands(message)
+        return
+
+    # من هنا فصاعداً، الكود سيشتغل فقط إذا كانت الرسالة داخل "روم البداية" المستهدف
+    is_violation = False
     violation_reason = ""
 
-    # 1. فحص إذا كانت الرسالة تحتوي على "صور مرفقة" (Attachments) -> هذا هو الأهم بناءً على طلبك
+    # إذا أرسل صورة في هذا الروم المخصص
     if message.attachments:
-        is_scam = True
-        violation_reason = "إرسال صورة مشبوهة / صورة اختراق محتملة"
+        is_violation = True
+        violation_reason = "إرسال صورة مشبوهة / محاولة اختراق في روم البداية"
 
-    # 2. فحص الكلمات المفتاحية النصية في حال وجدت
-    for word in SCAM_KEYWORDS:
-        if word in content_lower:
-            is_scam = True
-            violation_reason = f"إرسال رابط أو كلمات مشبوهة (تحتوي على: {word})"
-            break
+    # أو إذا كتب أي رابط أو كلمات مشبوهة
+    content_lower = message.content.lower()
+    if "http://" in content_lower or "https://" in content_lower:
+        is_violation = True
+        violation_reason = "إرسال رابط خارجي في روم البداية"
 
-    # إذا تأكد البوت أن هناك صورة أو رسالة مخالفة
-    if is_scam:
+    # إذا حدثت مخالفة في هذا الروم
+    if is_violation:
         try:
-            # أولاً: حذف الصورة أو الرسالة فوراً
+            # 1. حذف الرسالة أو الصورة فوراً
             await message.delete()
             
-            # ثانياً: معاقبة العضو المخترق بإعطائه "تايم أوت" (Timeout) لمدة أسبوع كامل (7 أيام)
+            # 2. معاقبة العضو بتايم أوت لمدة أسبوع (7 أيام)
             timeout_duration = datetime.timedelta(days=7)
             await message.author.timeout(timeout_duration, reason=violation_reason)
 
-            # ثالثاً: إرسال تفاصيل العقوبة في روم السجلات (Log Channel) بالـ ID الصحيح
+            # 3. إرسال السجل (Log) في روم السجلات المخصص
             log_channel = message.guild.get_channel(LOG_CHANNEL_ID)
-            
-            # إذا لم يتم العثور عليه بالـ ID، يبحث عنه بالاسم احتياطياً
-            if not log_channel:1528789041934368900
-            for channel in message.guild.text_channels:
-                    if channel.name in ["bot-logs", "سجلات-البوت", "log", "logs"]:
-                        log_channel = channel
-                        break
-
-            # إذا وُجد روم السجلات، يتم إرسال السجل (Embed)
             if log_channel:
                 embed = discord.Embed(
-                    title="🚨 سجل عقوبات حماية السيرفر (صور/هكر)",
+                    title="🚨 سجل الحماية (روم البداية)",
                     color=discord.Color.red(),
                     timestamp=datetime.datetime.now()
                 )
@@ -81,15 +75,14 @@ async def on_message(message):
                 
                 await log_channel.send(embed=embed)
 
-            # رابعاً: إرسال تنبيه مؤقت في الشات العام ثم حذفه بعد 10 ثواني
-            warning_msg = await message.channel.send(f"🚨 **نظام الحماية:** تم رصد صورة/رسالة مشبوهة من العضو {message.author.mention}، وتم حذفها وإعطاؤه تايم أوت أسبوع.")
+            # 4. تنبيه مؤقت في نفس روم البداية ثم حذفه بعد 10 ثواني
+            warning_msg = await message.channel.send(f"🚨 تنبيه {message.author.mention}: ممنوع إرسال الصور أو الروابط هنا! تم إعطاؤك تايم أوت أسبوع.")
             await warning_msg.delete(delay=10)
             
-            print(f"تم حذف صورة/رسالة مخترق بنجاح من العضو: {message.author.name} والسبب: {violation_reason}")
+            print(f"تم التصدي لمحاولة في روم البداية من العضو: {message.author.name}")
         except Exception as e:
-            print(f"خطأ أثناء معاقبة المخترق وإرسال السجل: {e}")
+            print(f"خطأ أثناء تنفيذ العقوبة في روم البداية: {e}")
 
-    # السماح بالأوامر الأخرى
     await bot.process_commands(message)
 
 # تشغيل البوت عبر بيئة العمل الآمنة في Railway أو التوكن المباشر
