@@ -63,23 +63,23 @@ async def on_message(message):
             log_channel = message.guild.get_channel(LOG_CHANNEL_ID)
             if log_channel:
                 embed = discord.Embed(
-                    title="🚨 سجل الحماية (روم البداية)",
+                    title="🚨 سجل الحماية (من الحسابات المخترقه)",
                     color=discord.Color.red(),
                     timestamp=datetime.datetime.now()
                 )
-                embed.add_field(name="👤 العضو المخترق", value=message.author.mention, inline=False)
-                embed.add_field(name="🛡️ المسؤول (البوت)", value=bot.user.mention, inline=False)
-                embed.add_field(name="⚖️ الإجراء المتخذ", value="تايم أوت لمدة أسبوع (7 أيام)", inline=False)
-                embed.add_field(name="📝 السبب", value=violation_reason, inline=False)
+                embed.add_field(name="👤 :العضو المخترق", value=message.author.mention, inline=False)
+                embed.add_field(name="🛡️ :المسؤول (البوت)", value=bot.user.mention, inline=False)
+                embed.add_field(name="⚖️ :الإجراء المتخذ", value="تايم أوت لمدة أسبوع (7 أيام)", inline=False)
+                embed.add_field(name="📝 :السبب", value=violation_reason, inline=False)
                 embed.set_footer(text=f"ID: {message.author.id}")
                 
                 await log_channel.send(embed=embed)
 
-            # 4. تنبيه مؤقت في نفس روم البداية ثم حذفه بعد 10 ثواني
+            # 4. تنبيه مؤقت في نفس روم البداية ثم حذفه بعد 11 ثواني
             warning_msg = await message.channel.send(f"🚨 تنبيه {message.author.mention}: ممنوع إرسال الصور أو الروابط هنا! تم إعطاؤك تايم أوت أسبوع.")
-            await warning_msg.delete(delay=10)
+            await warning_msg.delete(delay=11)
             
-            print(f"تم التصدي لمحاولة في روم البداية من العضو: {message.author.name}")
+            print(f"تم التصدي لحساب عضو مخترق : {message.author.name}")
         except Exception as e:
             print(f"خطأ أثناء تنفيذ العقوبة في روم البداية: {e}")
 
