@@ -71,7 +71,7 @@ class SecurityView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None) # الأزرار ثابتة ولا تنتهي أبداً
 
-    @discord.ui.button(label="إضافة تخطي لعضو✅", style=discord.ButtonStyle.green, custom_id="add_whitelist_btn")
+    @discord.ui.button(label="✅ إضافة تخطي لعضو", style=discord.ButtonStyle.green, custom_id="add_whitelist_btn")
     async def add_wl(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط (`Administrator`)!", ephemeral=True)
@@ -79,7 +79,7 @@ class SecurityView(discord.ui.View):
         # فتح استمارة/نافذة إدخال الآيدي مباشرة
         await interaction.response.send_modal(AddWhitelistModal())
 
-    @discord.ui.button(label="إزالة تخطي عضو❌", style=discord.ButtonStyle.red, custom_id="remove_whitelist_btn")
+    @discord.ui.button(label="❌ إزالة تخطي لعضو", style=discord.ButtonStyle.red, custom_id="remove_whitelist_btn")
     async def remove_wl(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط!", ephemeral=True)
@@ -87,7 +87,7 @@ class SecurityView(discord.ui.View):
         # فتح استمارة/نافذة إزالة الآيدي مباشرة
         await interaction.response.send_modal(RemoveWhitelistModal())
 
-    @discord.ui.button(label="حالة الحماية والمتخطين", style=discord.ButtonStyle.blurple, custom_id="status_whitelist_btn")
+    @discord.ui.button(label="📊 حالة الحماية والمتخطين", style=discord.ButtonStyle.blurple, custom_id="status_whitelist_btn")
     async def status_wl(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط!", ephemeral=True)
