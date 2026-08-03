@@ -20,7 +20,7 @@ WHITELISTED_USERS = set()
 async def on_ready():
     print(f"========================================")
     print(f"تم تسجيل الدخول بنجاح! البوت يعمل الآن باسم: {bot.user.name}")
-    print(f"نظام الحماية ولوحة التحكم التفاعلية جاهزة!")
+    print(f"نظام حماية الرومات، الرتب، والبوتات جاهز!")
     print(f"========================================")
     try:
         synced = await bot.tree.sync()
@@ -76,18 +76,16 @@ class SecurityView(discord.ui.View):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط (`Administrator`)!", ephemeral=True)
             return
-        # فتح استمارة/نافذة إدخال الآيدي مباشرة
         await interaction.response.send_modal(AddWhitelistModal())
 
-    @discord.ui.button(label="❌ إزالة تخطي لعضو", style=discord.ButtonStyle.red, custom_id="remove_whitelist_btn")
+    @discord.ui.button(label="❌ إزالة تخطي عضو", style=discord.ButtonStyle.red, custom_id="remove_whitelist_btn")
     async def remove_wl(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط!", ephemeral=True)
             return
-        # فتح استمارة/نافذة إزالة الآيدي مباشرة
         await interaction.response.send_modal(RemoveWhitelistModal())
 
-    @discord.ui.button(label="📊 حالة الحماية والمتخطين", style=discord.ButtonStyle.blurple, custom_id="status_whitelist_btn")
+    @discord.ui.button(label="📊 حالة الحماية وقائمة المتخطين", style=discord.ButtonStyle.blurple, custom_id="status_whitelist_btn")
     async def status_wl(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("❌ عذراً، هذا الزر مخصص للإدارة العليا فقط!", ephemeral=True)
@@ -104,15 +102,15 @@ class SecurityView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # أمر إظهار لوحة التحكم الثابتة الوحيد
-@bot.tree.command(name="security-panel", description="إظهار لوحة تحكم الحماية المركزية في السيرفر (للإدارة فقط)")
+@bot.tree.command(name="security-panel", description="إظهار لوحة تحكم الحماية الثابتة في السيرفر (للإدارة فقط)")
 async def security_panel(interaction: discord.Interaction):
     if not interaction.user.guild_permissions.administrator:
         await interaction.response.send_message("❌ لا تملك صلاحية لاستخدام هذا الأمر!", ephemeral=True)
         return
 
     embed = discord.Embed(
-        title="لوحة تحكم الحماية المركزية للسيرفر 🛡️",
-        description="هذه اللوحة ثابتة ومخصصة لمراقبة وإدارة أمان السيرفر ضد التخريب.\n\n• **حماية الرومات:** استرجاع الروم المحذوف فوراً بنفس الاسم والصلاحيات.\n• **حماية الرتب:** منع التخريب العشوائي.\n• **حماية البوتات:** منع دخول أي بوت غير مصرح به.\n\nاستخدم الأزرار أدناه للإدارة الفورية:",
+        title="🛡️ لوحة تحكم الحماية المركزية للسيرفر",
+        description="هذه اللوحة ثابتة ومخصصة لمراقبة وإدارة أمان السيرفر ضد التخريب.\n\n• **حماية الرومات:** استرجاع الروم المحذوف فوراً بنفس الاسم والصلاحيات.\n• **حماية الرتب:** استرجاع الرتبة المحذوفة فوراً بكافة صلاحياتها.\n• **حماية البوتات:** منع دخول أي بوت غير مصرح به.\n\nاستخدم الأزرار أدناه للإدارة الفورية:",
         color=discord.Color.dark_embed(),
         timestamp=datetime.datetime.now()
     )
@@ -187,6 +185,51 @@ async def on_guild_channel_delete(channel):
     except Exception as e:
         print(f"خطأ في حماية حذف الرومات: {e}")
 
+# ----------------- حماية الحذف واسترجاع الرتب (Anti-Role Nuke) -----------------
+@bot.event
+async def on_guild_role_delete(role):
+    try:
+        async for entry in role.guild.audit_logs(limit=1, action=discord.AuditLogAction.role_delete):
+            user = entry.user
+            if user.id in WHITELISTED_USERS or user.bot or user.id == role.guild.owner_id:
+                return
+
+            guild = role.guild
+            # إعادة إنشاء الرتبة المحذوفة بنفس الاسم، الصلاحيات، اللون، والخصائص
+            new_role = await guild.create_role(
+                name=role.name,
+                permissions=role.permissions,
+                color=role.color,
+                hoist=role.hoist,
+                mentionable=role.mentionable,
+                reason=f"حماية التخريب: استرجاع الرتبة المحذوفة بواسطة {user.name}"
+            )
+
+            log_channel = guild.get_channel(LOG_CHANNEL_ID)
+            if log_channel:
+                guild_name = guild.name
+                guild_icon = guild.icon.url if guild.icon else None
+
+                embed = discord.Embed(
+                    title="🚨 إنذار حماية: تم حذف رتبة واسترجاعها تلقائياً!",
+                    color=discord.Color.red(),
+                    timestamp=datetime.datetime.now()
+                )
+                if guild_icon:
+                    embed.set_author(name=guild_name, icon_url=guild_icon)
+                else:
+                    embed.set_author(name=guild_name)
+
+                embed.add_field(name="👤 الشخص المخرب:", value=user.mention, inline=False)
+                embed.add_field(name="🏷️ الرتبة المحذوفة:", value=role.name, inline=False)
+                embed.add_field(name="⚖️ الإجراء المتخذ:", value="تم إعادة إنشاء الرتبة مع كافة صلاحياتها ولونها بنجاح!", inline=False)
+                embed.set_thumbnail(url=user.display_avatar.url)
+                embed.set_footer(text=f"ID: {user.id}")
+                
+                await log_channel.send(embed=embed)
+    except Exception as e:
+        print(f"خطأ في حماية حذف الرتب: {e}")
+
 # ----------------- حماية دخول البوتات (Anti-Bot) -----------------
 @bot.event
 async def on_member_join(member):
@@ -255,7 +298,7 @@ async def on_message(message):
 
     if message.attachments:
         is_violation = True
-        violation_reason = "إرسال صورة مشبوهة أو غير مرغوب فيها/ حساب مخترق"
+        violation_reason = "إرسال صورة مشبوهة أو غير مرغوب فيها / حساب مخترق"
 
     content_lower = message.content.lower()
     if "http://" in content_lower or "https://" in content_lower:
